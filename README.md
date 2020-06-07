@@ -7,5 +7,5 @@ This is a fully functional, highly scalable Cucumber Selenium framework structur
 ### Getting Started
 To start a new project, clone the repo without the commit history
 ``` 
-git clone --depth 1
+git clone --depth 1 https://github.com/ankitnandwani/CucumberPrototype.git
 ```
