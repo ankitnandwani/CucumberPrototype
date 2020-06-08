@@ -9,3 +9,13 @@ To start a new project, clone the repo without the commit history
 ``` 
 git clone --depth 1 https://github.com/ankitnandwani/CucumberPrototype.git
 ```
+
+### Rum maven goal
+There are some sample test cases, to verify the setup is correct.
+```
+mvn test
+```
+If build is successful, you can start writing your test cases.
+
+### Debug
+1. Make sure your chrome (or firefox) version matches the chromedriver (or geckodriver) version.
