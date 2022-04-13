@@ -1,6 +1,6 @@
-#ReqTestUIBDD
+# ReqTestUIBDD
 BDD UI Framework integration with ReqTest
 
 
-#Run
+# Run
 Execute the testNg.xml file to run all test cases.
