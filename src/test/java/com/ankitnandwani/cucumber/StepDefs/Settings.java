@@ -3,9 +3,9 @@ package com.ankitnandwani.cucumber.StepDefs;
 import com.ankitnandwani.cucumber.Browser;
 import com.ankitnandwani.cucumber.Hooks;
 import com.ankitnandwani.cucumber.Repo.SettingsPage;
-import cucumber.api.java.en.Given;
-import cucumber.api.java.en.Then;
-import cucumber.api.java.en.When;
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
 import org.junit.Assert;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.Select;
@@ -37,8 +37,8 @@ public class Settings {
         settings = browser.getSettingsPage();
         driver.get(prop.getProperty("URL"));
         settings.getSettingsLink().click();
-        hooks.explicitWait(driver,2, settings.getOtherSettings());
-        settings.getOtherSettings().click();
+        hooks.explicitWait(driver,2, settings.getAllSettings());
+        settings.getAllSettings().click();
     }
 
     @When("^I toggle safe search dropdown and click save$")
@@ -53,8 +53,8 @@ public class Settings {
     @Then("^dropdown should be changed successfully$")
     public void searchResultsShouldBeDisplayed(){
         settings.getSettingsLink().click();
-        hooks.explicitWait(driver,2, settings.getOtherSettings());
-        settings.getOtherSettings().click();
+        hooks.explicitWait(driver,2, settings.getAllSettings());
+        settings.getAllSettings().click();
         hooks.explicitWait(driver,2, settings.getSafeSearch());
         String actual = safeSearch.getFirstSelectedOption().getText();
         Assert.assertEquals(expected, actual);

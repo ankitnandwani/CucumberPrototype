@@ -3,17 +3,20 @@ package com.ankitnandwani.cucumber;
 
 import com.ankitnandwani.cucumber.Repo.HomePage;
 import com.ankitnandwani.cucumber.Repo.SettingsPage;
-import com.ankitnandwani.cucumber.StepDefs.GridPage;
-import com.applitools.eyes.BatchInfo;
-import com.applitools.eyes.TestResultsSummary;
-import com.applitools.eyes.selenium.BrowserType;
-import com.applitools.eyes.selenium.Configuration;
-import com.applitools.eyes.selenium.Eyes;
-import com.applitools.eyes.visualgrid.model.DeviceName;
-import com.applitools.eyes.visualgrid.model.ScreenOrientation;
-import com.applitools.eyes.visualgrid.services.VisualGridRunner;
-import cucumber.api.java.After;
-import cucumber.api.java.Before;
+import com.backend.Constants;
+import com.google.gson.Gson;
+import com.reqtest.Entities.Request.CreateTestRun;
+import com.reqtest.Entities.Request.Fields;
+import com.reqtest.Entities.Request.Name;
+import com.reqtest.Entities.Response.Content;
+import com.reqtest.Entities.Response.CreateTestRunResponse;
+import com.reqtest.Entities.Response.GetContentsResponse;
+import com.reqtest.TestRunController;
+import io.cucumber.java.Before;
+import io.cucumber.java.After;
+import io.cucumber.java.Scenario;
+import io.cucumber.java.Status;
+import org.apache.commons.lang3.RandomUtils;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.firefox.FirefoxDriver;
@@ -23,7 +26,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
+import java.util.function.Predicate;
 
 /**
  * Created by mac on 25/08/17.
@@ -34,12 +40,15 @@ public class Browser {
     private Properties prop;
     private HomePage homePage;
     private SettingsPage settings;
-    private Eyes eyes;
-    private VisualGridRunner runner;
+    TestRunController testRunController = new TestRunController();
+    String base_url;
+    Gson gson = new Gson();
+    static boolean bSuite = false;
+    static String testRunId;
 
 
     @Before
-    public void setUp(){
+    public void setUp(Scenario scenario){
         FileInputStream f = null;
         try{
             f = new FileInputStream(new File("src/test/Resources/com/ankitnandwani/cucumber/Config.properties"));
@@ -56,6 +65,7 @@ public class Browser {
         String browser = prop.getProperty("browser");
         switch (browser){
             case "chrome" :
+                System.out.println("Chromedriver path " + prop.getProperty("driverExecutable") + "/chromedriver");
                 System.setProperty("webdriver.chrome.driver",prop.getProperty("driverExecutable") + "/chromedriver");
                 driver = new ChromeDriver();
                 break;
@@ -69,44 +79,20 @@ public class Browser {
                 driver = new SafariDriver();
                 break;
 
-            case "applitools" :
-                System.setProperty("webdriver.chrome.driver",prop.getProperty("driverExecutable") + "/chromedriver");
-                driver = new ChromeDriver();
-                runner = new VisualGridRunner(10);
-                eyes = new Eyes(runner);
-                configureEyes(eyes);
-
         }
 
         homePage = new HomePage(driver);
         settings = new SettingsPage(driver);
 
-    }
-
-    public void configureEyes(Eyes eyes) {
-
-        // Initialize eyes Configuration
-        Configuration config = new Configuration();
-
-        // You can get your api key from the Applitools dashboard
-        config.setApiKey("ENTER_YOUR_API_KEY");
-
-        // create a new batch info instance and set it to the configuration
-        config.setBatch(new BatchInfo("UFG Hackathon"));
-
-        // Add browsers with different viewports
-        config.addBrowser(800, 600, BrowserType.CHROME);
-        config.addBrowser(700, 500, BrowserType.FIREFOX);
-        config.addBrowser(1600, 1200, BrowserType.IE_11);
-        config.addBrowser(1024, 768, BrowserType.EDGE_CHROMIUM);
-        config.addBrowser(800, 600, BrowserType.SAFARI);
-
-        // Add mobile emulation devices in Portrait mode
-        config.addDeviceEmulation(DeviceName.iPhone_X, ScreenOrientation.PORTRAIT);
-        config.addDeviceEmulation(DeviceName.Pixel_2, ScreenOrientation.PORTRAIT);
-
-        // Set the configuration object to eyes
-        eyes.setConfiguration(config);
+        if(!bSuite){
+            String executionTitle = "Suite Execution - " + RandomUtils.nextInt();
+            CreateTestRunResponse response = testRunController.createNewTestRun(
+                    getApiPath(Constants.REQTEST, Constants.CREATE_TEST_RUN),
+                    getReqtestHeaders(),
+                    getCreateTestRunBody(executionTitle));
+            testRunId = Long.toString(response.getResult().getId());
+            bSuite = true;
+        }
 
     }
 
@@ -126,17 +112,64 @@ public class Browser {
         return settings;
     }
 
-    public Eyes getEyes() {
-        return eyes;
+    @After
+    public void tearDown(Scenario scenario) {
+        String testResult = scenario.getStatus() == Status.PASSED ? "OK" : "Failed";
+
+        String reqTestCaseId = scenario.getSourceTagNames().toArray()[1].toString().substring(1);
+
+        testRunController.addTestcase(
+                getApiPath(Constants.REQTEST, Constants.ADD_TEST_CASE),
+                getReqtestHeaders(),
+                getArrayBody(reqTestCaseId),
+                testRunId);
+
+        GetContentsResponse contentsResponse = testRunController.getTestRunContents(
+                getApiPath(Constants.REQTEST, Constants.GET_CONTENTS),
+                getReqtestHeaders(),
+                testRunId);
+
+        Predicate<Content> findWithTestCaseName = e -> e.getName().equals(scenario.getName());
+        long contentId = contentsResponse.getResult().getContents().stream()
+                .filter(findWithTestCaseName).findFirst().get().getId();
+
+        testRunController.executeContent(
+                getApiPath(Constants.REQTEST, Constants.EXECUTE_CONTENT),
+                getReqtestHeaders(),
+                getResultQueryParams(testResult),
+                testRunId,
+                getArrayBody(String.valueOf(contentId)));
+        driver.quit();
     }
 
-    @After
-    public void tearDown(){
+    public String getApiPath(String url, String path){
+        base_url = prop.getProperty(url + "_BASE_URL");
+        return base_url + path;
+    }
 
-        eyes.abortAsync();
-        driver.quit();
-        TestResultsSummary allTestResults = runner.getAllTestResults(false);
-        System.out.println(allTestResults);
+    public Map<String, ?> getReqtestHeaders(){
+        Map<String, String> headers = new HashMap<>();
+        headers.put("accept", "application/json");
+        headers.put("Content-Type", "application/json");
+        headers.put("reqtest-pat", Constants.REQTEST_PAT);
+        return headers;
+    }
+
+    private String getCreateTestRunBody(String testRunTitle){
+        Name name = Name.builder().value(testRunTitle).build();
+        Fields fields = Fields.builder().Name(name).build();
+        CreateTestRun testRun = CreateTestRun.builder().fields(fields).build();
+        return gson.toJson(testRun);
+    }
+
+    private String getArrayBody(String id){
+        return "[ " + id + " ]";
+    }
+
+    private Map<String, String> getResultQueryParams(String result){
+        Map<String, String> qParams = new HashMap<>();
+        qParams.put("result", result);
+        return qParams;
     }
 
 

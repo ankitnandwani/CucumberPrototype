@@ -17,8 +17,8 @@ public class SettingsPage {
     @FindBy(partialLinkText = "⇶")
     private WebElement settingsLink;
 
-    @FindBy(partialLinkText = "Other Settings")
-    private WebElement otherSettings;
+    @FindBy(partialLinkText = "All Settings")
+    private WebElement allSettings;
 
     @FindBy(id = "setting_kp")
     private WebElement safeSearch;
@@ -30,8 +30,8 @@ public class SettingsPage {
         return settingsLink;
     }
 
-    public WebElement getOtherSettings(){
-        return otherSettings;
+    public WebElement getAllSettings(){
+        return allSettings;
     }
 
     public WebElement getSafeSearch(){
